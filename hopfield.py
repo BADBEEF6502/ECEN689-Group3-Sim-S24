@@ -15,6 +15,9 @@ input_size = 8 * 8
 hidden_size = 32
 output_size = 10
 
+# Add learning rate
+learning_rate = 0.1
+
 # Initialize input and output layers
 input_layer = np.zeros((input_size, 1))
 hidden_layer = np.zeros((hidden_size, 1))
@@ -34,6 +37,9 @@ epoch = 10
 batch_count = 100
 batch_size = 500
 
+# Equilibrium propagation parameters
+beta = 1
+
 
 
 # Start an epoch
@@ -52,16 +58,44 @@ for e in range(epoch):
             hidden_layer = input_layer @ in_hidden_weights
         
             # Run through sigmoid function
-            hidden_layer = sigmoid(hidden_layer)
+            hidden_layer_sig = sigmoid(hidden_layer)
         
             # Run new matrix through second weights set into output
-            output_layer = hidden_layer @ hidden_out_weights
+            output_layer = hidden_layer_sig @ hidden_out_weights
 
             # Run through sigmoid function
-            output_layer = sigmoid(output_layer)
+            output_layer_sig = sigmoid(output_layer)
+
+            # Generate the target vector
+            target = np.zeros(10)
+            for i in range(10):
+                if (i == label[iteration*b]):
+                    target[i] = 1
+                else:
+                    target[i] = 0
         
             # Setup equilibrium propagation to update weights
-            
+                    
+            # First, calculate the output derivative of Hebbian energy matrix
+            dEdW_ij = np.zeros(output_size, 10)
+            for i in range(output_size):
+                for j in range(output_size):
+                    if (i != j):
+                        dEdW_ij[i] += -0.5 * (output_layer_sig[i] * output_layer_sig[j])
+
+            # Next, calculate the mean square error derivative matrix
+            # Chain rule, pain rule
+            dCdo = - (target - output_layer_sig)
+            dody = sigmoid_prime(output_layer)
+
+            # Fill based on inputs from hidden layer, (hidden_layer_sig)
+            dydW_ij = np.zeros((output_size, hidden_size))
+            for i in range(output_size):
+                for j in range(hidden_size):
+                    pass
+                    # Sum up the inputs that are multiplied into the weights matrix indicated by i and j
+                    # dydW_ij += 
+
 
 
 
