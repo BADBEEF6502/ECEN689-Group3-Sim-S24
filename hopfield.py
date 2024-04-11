@@ -94,8 +94,23 @@ for e in range(epoch):
                 for j in range(hidden_size):
                     pass
                     # Sum up the inputs that are multiplied into the weights matrix indicated by i and j
-                    # dydW_ij += 
+                    dydW_ij[i][j] += hidden_layer_sig[j]
 
+            # Set G2 gradient matrix to be element-wise multiplication of dCdo * dody and matrix multiply dydW_ij
+            G2 = np.multiply(dCdo, dody) @ dydW_ij
 
+            # Now set up gradient matrix G1 for use in recalculating the gradient
+            dCdo2 = np.multiply(hidden_layer_sig, dEdW_ij)
+            dody2 = sigmoid_prime(hidden_layer)
+            dydW_ij2 = np.zeros((hidden_size, input_size))
+            for i in range(hidden_size):
+                for j in range(input_size):
+                    dydW_ij2[i][j] += input_layer[j]
+            
+            G1 = np.multiply(dCdo2, dody2) @ dydW_ij2
+
+            # Apply the gradient and learning rate to the weights and try again
+            in_hidden_weights -= np.multiply(learning_rate, G1)
+            hidden_out_weights -= np.multiply(learning_rate, G2)
 
 
