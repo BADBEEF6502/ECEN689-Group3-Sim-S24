@@ -1,5 +1,5 @@
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 
 def sigmoid(matrix):
@@ -44,8 +44,8 @@ beta = 1
 # Free phase is calculated with beta set to zero, AKA ignore beta and mean square error
 def free_phase(input_layer, in_hidden_weights, hidden_out_weights, target):
     # Continually calculate dE/dW_ij until convergence
-    dEdW_ij = np.zeros(hidden_size, input_size)
-    dEdW_ij2 = np.zeros(output_size, hidden_size)
+    dEdW_ij = np.zeros((hidden_size, input_size))
+    dEdW_ij2 = np.zeros((output_size, hidden_size))
 
 
     for i in range(100):
@@ -111,24 +111,24 @@ def free_phase(input_layer, in_hidden_weights, hidden_out_weights, target):
 
 def clamped_phase(input_layer, in_hidden_weights, hidden_out_weights, target):
     # Continually calculate dE/dW_ij until convergence
-    dFdW_ij = np.zeros(hidden_size, input_size)
-    dFdW_ij2 = np.zeros(output_size, hidden_size)
+    dFdW_ij = np.zeros((hidden_size, input_size))
+    dFdW_ij2 = np.zeros((output_size, hidden_size))
 
     for i in range(100):
         # Take in the input and multiply by a weights matrix
-        hidden_layer = input_layer @ in_hidden_weights
+        hidden_layer = in_hidden_weights @ input_layer
 
         # Run through sigmoid function
         hidden_layer_sig = sigmoid(hidden_layer)
 
         # Run new matrix through second weights set into output
-        output_layer = hidden_layer_sig @ hidden_out_weights
+        output_layer = hidden_out_weights @ hidden_layer_sig
 
         # Run through sigmoid function
         output_layer_sig = sigmoid(output_layer)
 
         # Calculate the free phase weights to sum with clamped weights
-        dEdW_ij, dEdW_ij2 = free_phase(input_layer, in_hidden_weights, hidden_out_weights)
+        dEdW_ij, dEdW_ij2 = free_phase(input_layer, in_hidden_weights, hidden_out_weights, target)
 
         # Calculate the gradient descent values to get the final 
         # Chain rule, pain rule
@@ -146,6 +146,7 @@ def clamped_phase(input_layer, in_hidden_weights, hidden_out_weights, target):
         G2 = (np.multiply(dCdo, dody) @ dydW_ij)
 
         # Now set up gradient matrix G1 for use in recalculating the gradient
+        ### ERROR BELOW: SECOND BACKPROP NOT CORRECT, FIX NOW ###
         dCdo2 = np.multiply(hidden_layer_sig, dFdW_ij)
         dody2 = sigmoid_prime(hidden_layer)
         dydW_ij2 = np.zeros((hidden_size, input_size))
@@ -170,6 +171,9 @@ def clamped_phase(input_layer, in_hidden_weights, hidden_out_weights, target):
     return (dFdW_ij, dFdW_ij2)
 
 
+# Save total correct guesses over time
+correct_guess = 0
+guess_mat = np.zeros((batch_count * batch_size))
 
 # Start an epoch
 for e in range(epoch):
@@ -191,6 +195,11 @@ for e in range(epoch):
             npr, npr2 = clamped_phase(input_layer, in_hidden_weights, hidden_out_weights, target)
             fpr, fpr2 = free_phase(input_layer, in_hidden_weights, hidden_out_weights, target)
 
+            # Determine if the guess is correct
+            if (np.argmax(target) == np.argmax(output_layer)):
+                correct_guess += 1
+                guess_mat[100*b + iteration] = correct_guess
+
             # Calculate change in theta, AKA actual change to weights
             dW = (-1/beta) * (npr - fpr)
             dW2 = (-1/beta) * (npr2 - fpr2)
@@ -199,3 +208,7 @@ for e in range(epoch):
             in_hidden_weights += dW
             hidden_out_weights += dW2
 
+
+# Graph the correct guesses over time
+plt.plot(range(batch_count*batch_size), guess_mat)
+plt.show()
