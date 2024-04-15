@@ -33,7 +33,7 @@ label = mnist_data['x']
 data = mnist_data['y']
 
 # Initialize variables related to model generation
-epoch = 10
+epoch = 1
 batch_count = 100
 batch_size = 500
 
