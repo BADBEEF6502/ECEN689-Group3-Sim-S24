@@ -81,6 +81,9 @@ def clamped_phase(input_layer, hidden_layer, output_layer, in_hidden_weights, hi
 # Save total correct guesses over time
 correct_guess = 0
 guess_mat = np.zeros((batch_count * batch_size * epoch))
+dw_mat = np.zeros((batch_count * batch_size * epoch))
+dw2_mat = np.zeros((batch_count * batch_size * epoch))
+guess_bar_graph = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
 # Start an epoch
 for e in range(epoch):
@@ -98,6 +101,7 @@ for e in range(epoch):
             for i in range(output_size):
                 if (i == label[500*b + iteration]):
                     target[i] = 1
+                    guess_bar_graph[i] += 1
                 else:
                     target[i] = 0
             
@@ -106,13 +110,20 @@ for e in range(epoch):
             h_clamped, out_clamped = clamped_phase(input_layer, h_free, out_free, in_hidden_weights, hidden_out_weights, target)
 
             # Determine if the guess is correct using the free phase
-            if (np.argmax(target) == np.argmax(out_free)):
+            # USE FORWARD PROP
+            h = sigmoid(input_layer @ in_hidden_weights)
+            out = sigmoid(h @ hidden_out_weights)
+            if (np.argmax(target) == np.argmax(out)):
                 correct_guess += 1
                 guess_mat[e*50000 + 500*b + iteration] = correct_guess
 
             # Calculate change in theta, AKA actual change to weights
             dW = alpha_1 * (1 / beta) * (np.outer(input_layer, h_clamped) - np.outer(input_layer, h_free))
             dW2 = alpha_2 * (1 / beta) * (np.outer(hidden_layer, out_clamped) - np.outer(hidden_layer, out_free))
+
+            # Load into dW matrices
+            np.append(dw_mat, dW)
+            np.append(dw2_mat, dW2)
 
             # Calculate new weights and run again
             in_hidden_weights += dW
@@ -130,5 +141,19 @@ for e in range(epoch):
 
 # Graph the correct guesses over time
 plt.plot(range(batch_count*batch_size*epoch), guess_mat)
-plt.savefig("plot.png")
+plt.savefig("guess_cumulative.png")
+plt.close()
+
+plt.bar(range(1,11), guess_bar_graph)
+plt.savefig("guess_bar.png")
+plt.close()
+
+plt.plot(range(batch_count*batch_size*epoch), dw_mat)
+plt.savefig("dW.png")
+plt.close()
+
+plt.plot(range(batch_count*batch_size*epoch), dw2_mat)
+plt.savefig("dW2.png")
+plt.close()
+
 # plt.show()
