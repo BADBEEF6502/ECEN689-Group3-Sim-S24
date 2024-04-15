@@ -19,13 +19,13 @@ output_size = 10
 learning_rate = 0.1
 
 # Initialize input and output layers
-input_layer = np.zeros((input_size, 1))
-hidden_layer = np.zeros((hidden_size, 1))
-output_layer = np.zeros((output_size, 1))
+input_layer = np.zeros((1, input_size))
+hidden_layer = np.zeros((1, hidden_size))
+output_layer = np.zeros((1, output_size))
 
 # Also initialize weights matrices, but with random numbers
-in_hidden_weights = np.random.randn(hidden_size, input_size)
-hidden_out_weights = np.random.randn(output_size, hidden_size)
+in_hidden_weights = np.random.randn(input_size, hidden_size)
+hidden_out_weights = np.random.randn(hidden_size, output_size)
 
 # Load in the input data
 mnist_data = np.load('sim/MNIST_8x8.npz')
@@ -38,137 +38,39 @@ batch_count = 100
 batch_size = 500
 
 # Equilibrium propagation parameters
+alpha_1 = 0.01
+alpha_2 = 0.005
 beta = 1
 
 
 # Free phase is calculated with beta set to zero, AKA ignore beta and mean square error
-def free_phase(input_layer, in_hidden_weights, hidden_out_weights, target):
-    # Continually calculate dE/dW_ij until convergence
-    dEdW_ij = np.zeros((hidden_size, input_size))
-    dEdW_ij2 = np.zeros((output_size, hidden_size))
+def free_phase(input_layer, hidden_layer, output_layer, in_hidden_weights, hidden_out_weights):
+    for _ in range(100):
+        # Continually calculate dE/dW_ij and hidden layer until convergence (*.T means transpose)
+        dEdW_ij = sigmoid_prime(hidden_layer) * (np.dot(input_layer, in_hidden_weights) + np.dot(output_layer, hidden_out_weights.T)) - hidden_layer
+        dEdW_ij2 = sigmoid_prime(output_layer) * (np.dot(hidden_layer, hidden_out_weights)) - output_layer
 
-
-    for i in range(100):
-        # Take in the input and multiply by a weights matrix
-        hidden_layer = in_hidden_weights @ input_layer
-
-        # Run through sigmoid function
-        hidden_layer_sig = sigmoid(hidden_layer)
-
-        # Run new matrix through second weights set into output
-        output_layer = hidden_out_weights @ hidden_layer_sig
-
-        # Run through sigmoid function
-        output_layer_sig = sigmoid(output_layer)
-
-        # Use gradient descent to alter the weights
-        # Chain rule, pain rule
-        dCdo = - (target - output_layer_sig)
-        dody = sigmoid_prime(output_layer)
-        # Fill based on inputs from hidden layer, (hidden_layer_sig)
-        dydW_ij = np.zeros((output_size, hidden_size))
-        for i in range(output_size):
-            for j in range(hidden_size):
-                # Sum up the inputs that are multiplied into the weights matrix indicated by i and j
-                dydW_ij[i][j] += hidden_layer_sig[j]
-        # Set G2 gradient matrix to be element-wise multiplication of dCdo * dody and matrix multiply dydW_ij
-        G2 = (np.multiply(dCdo, dody) @ dydW_ij)
-
-        # Now set up gradient matrix G1 for use in recalculating the gradient
-        dCdo2 = np.multiply(hidden_layer_sig, dCdo)
-        dody2 = sigmoid_prime(hidden_layer)
-        dydW_ij2 = np.zeros((hidden_size, input_size))
-        for i in range(hidden_size):
-            for j in range(input_size):
-                dydW_ij2[i][j] += input_layer[j]
-        
-        # Do same for 2
-        G1 = (np.multiply(dCdo2, dody2) @ dydW_ij2)
-
-        # Update rule
-        hidden_out_weights -= learning_rate*G2
-        in_hidden_weights -= learning_rate*G1
-
-
-
-        # Continually calculate dE/dW_ij until convergence
-        for i in range(output_size):
-            for j in range(hidden_size):
-                if (i != j):
-                    dEdW_ij2[i] += -0.5 * (output_layer_sig[i] * output_layer_sig[j])
-        
-        # Do the same for the hidden layer
-        for i in range(hidden_size):
-            for j in range(input_size):
-                if (i != j):
-                    dEdW_ij[i] += -0.5 * (hidden_layer_sig[i] * hidden_layer_sig[j])
+        # Update the layers
+        hidden_layer = sigmoid(hidden_layer + learning_rate*dEdW_ij)
+        output_layer = sigmoid(output_layer + learning_rate*dEdW_ij2)
     
-    # Return the calculated dE/dW_ij after convergence
-    return (dEdW_ij, dEdW_ij2)
+    # Return the calculated hidden and output layers
+    return (hidden_layer, output_layer)
 
 
 
 
-def clamped_phase(input_layer, in_hidden_weights, hidden_out_weights, target):
-    # Continually calculate dE/dW_ij until convergence
-    dFdW_ij = np.zeros((hidden_size, input_size))
-    dFdW_ij2 = np.zeros((output_size, hidden_size))
+def clamped_phase(input_layer, hidden_layer, output_layer, in_hidden_weights, hidden_out_weights, target):
+    for i in range(20):
+        hidden_free, output_free = free_phase(input_layer, hidden_layer, output_layer, in_hidden_weights, hidden_out_weights)
+        dCdW_ij = output_free + beta * (target - output_layer)
 
-    for i in range(100):
-        # Take in the input and multiply by a weights matrix
-        hidden_layer = in_hidden_weights @ input_layer
-
-        # Run through sigmoid function
-        hidden_layer_sig = sigmoid(hidden_layer)
-
-        # Run new matrix through second weights set into output
-        output_layer = hidden_out_weights @ hidden_layer_sig
-
-        # Run through sigmoid function
-        output_layer_sig = sigmoid(output_layer)
-
-        # Calculate the free phase weights to sum with clamped weights
-        dEdW_ij, dEdW_ij2 = free_phase(input_layer, in_hidden_weights, hidden_out_weights, target)
-
-        # Calculate the gradient descent values to get the final 
-        # Chain rule, pain rule
-        dCdo = - (target - output_layer_sig)
-        dody = sigmoid_prime(output_layer)
-
-        # Fill based on inputs from hidden layer, (hidden_layer_sig)
-        dydW_ij = np.zeros((output_size, hidden_size))
-        for i in range(output_size):
-            for j in range(hidden_size):
-                # Sum up the inputs that are multiplied into the weights matrix indicated by i and j
-                dydW_ij[i][j] += hidden_layer_sig[j]
-
-        # Set G2 gradient matrix to be element-wise multiplication of dCdo * dody and matrix multiply dydW_ij
-        G2 = (np.multiply(dCdo, dody) @ dydW_ij)
-
-        # Now set up gradient matrix G1 for use in recalculating the gradient
-        ### ERROR BELOW: SECOND BACKPROP NOT CORRECT, FIX NOW ###
-        dCdo2 = np.multiply(hidden_layer_sig, dFdW_ij)
-        dody2 = sigmoid_prime(hidden_layer)
-        dydW_ij2 = np.zeros((hidden_size, input_size))
-        for i in range(hidden_size):
-            for j in range(input_size):
-                dydW_ij2[i][j] += input_layer[j]
-        
-        # Do same for 2
-        G1 = (np.multiply(dCdo2, dody2) @ dydW_ij2)
-
-        # Update rule
-        hidden_out_weights -= learning_rate*G2
-        in_hidden_weights -= learning_rate*G1
-
-        # Continually recalculate dF/dW_ij
-        dEdW_ij, dEdW_ij2 = free_phase(input_layer, in_hidden_weights, hidden_out_weights, target)
-
-        dFdW_ij2 = dEdW_ij2 + beta*G2
-        dFdW_ij = dEdW_ij + beta*G1     
+        # Update layers
+        hidden_layer = hidden_free
+        output_layer = sigmoid(output_layer + learning_rate*dCdW_ij)
 
 
-    return (dFdW_ij, dFdW_ij2)
+    return (hidden_layer, output_layer)
 
 
 # Save total correct guesses over time
@@ -191,24 +93,30 @@ for e in range(epoch):
                 else:
                     target[i] = 0
             
-            # Calculate npr and fpr
-            npr, npr2 = clamped_phase(input_layer, in_hidden_weights, hidden_out_weights, target)
-            fpr, fpr2 = free_phase(input_layer, in_hidden_weights, hidden_out_weights, target)
+            # Calculate free and weakly clamped phase
+            h_free, out_free = free_phase(input_layer, hidden_layer, output_layer, in_hidden_weights, hidden_out_weights)
+            h_clamped, out_clamped = clamped_phase(input_layer, hidden_layer, output_layer, in_hidden_weights, hidden_out_weights, target)
 
-            # Determine if the guess is correct
-            if (np.argmax(target) == np.argmax(output_layer)):
+            # Determine if the guess is correct using the free phase
+            if (np.argmax(target) == np.argmax(out_free)):
                 correct_guess += 1
-                guess_mat[100*b + iteration] = correct_guess
+                guess_mat[500*b + iteration] = correct_guess
 
             # Calculate change in theta, AKA actual change to weights
-            dW = (-1/beta) * (npr - fpr)
-            dW2 = (-1/beta) * (npr2 - fpr2)
+            dW = alpha_1 * (1 / beta) * (np.outer(input_layer, h_clamped) - np.outer(input_layer, h_free))
+            dW2 = alpha_2 * (1 / beta) * (np.outer(hidden_layer, out_clamped) - np.outer(hidden_layer, out_free))
 
             # Calculate new weights and run again
             in_hidden_weights += dW
             hidden_out_weights += dW2
 
+            # Diminish alpha over time
+            if ((b*500 + iteration) % 2500 == 2499):
+                alpha_1 /= 10
+                alpha_2 /= 10
+
 
 # Graph the correct guesses over time
 plt.plot(range(batch_count*batch_size), guess_mat)
-plt.show()
+plt.savefig("plot.png")
+# plt.show()
