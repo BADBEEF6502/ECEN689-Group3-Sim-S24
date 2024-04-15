@@ -117,6 +117,11 @@ for e in range(epoch):
                 correct_guess += 1
                 guess_mat[e*50000 + 500*b + iteration] = correct_guess
 
+            assert h_free.faltten().any() != 0, 'ERROR: f_free is zeros!'
+            assert out_free.flatten().any() != 0, 'ERROR: out_free is zeros!'
+            assert h_clamped.flatten().any() != 0, 'ERROR: h_clamped is zeros!'
+            assert out_clamped.flatten().any() != 0, 'ERROR: out_clamped is zeros!'
+            
             # Calculate change in theta, AKA actual change to weights
             dW = alpha_1 * (1 / beta) * (np.outer(input_layer, h_clamped) - np.outer(input_layer, h_free))
             dW2 = alpha_2 * (1 / beta) * (np.outer(hidden_layer, out_clamped) - np.outer(hidden_layer, out_free))
