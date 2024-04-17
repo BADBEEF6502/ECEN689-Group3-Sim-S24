@@ -1,4 +1,8 @@
+# This overfits, but to what idk? 0?
 import numpy as np
+
+# Set a seed to generate consistent random results, useful for debugging.
+np.random.seed(0)
 
 # Load in the MNIST data.
 mnist_data = np.load('MNIST_8x8.npz')
@@ -11,14 +15,14 @@ HIDDEN_SIZE = 32
 OUTPUT_SIZE = 10
 
 # Network Hyperparameters.
-MAX_EPOCH                = 50000    # Maximum training epoch.
+MAX_EPOCH                = 90000    # Maximum training epoch.
 MAX_FREE_PHASE           = 100      # Must be experimentaly determined.
 MAX_WEAKLY_CLAMPED_PHASE = 20       # Must be experimentaly determined.
 EVAL                     = 100      # Every 100 steps perform an evaluation.
 BETA                     = 1.0      # Default.
 EPSILON                  = 0.05     # Exploration hyperparameter.
-alpha1                   = 0.1      # Alpha1 is a learning rate hyperparameter, adjustable in run.
-alpha2                   = 0.05     # Alpha2 is a learning rate hyperparameter, adjustable in run.
+alpha1                   = 0.01     # Alpha1 is a learning rate hyperparameter, adjustable in run.
+alpha2                   = 0.005    # Alpha2 is a learning rate hyperparameter, adjustable in run.
 
 # One hot encoding for each target value, accessed oneHotEncode[target].
 oneHotEncode = np.eye(OUTPUT_SIZE)
@@ -52,11 +56,12 @@ def weaklyClampedPhase(h, x, y, wxh, why, by, bh, BETA, t):
     return np.copy(gh), np.copy(gy)
 
 # Used for debugging and data collection.
-correct = 0                     # Cumulative result of correct guesses per epoch.
-guesses           = np.empty(MAX_EPOCH) # Store all of the guesses.
-actual            = np.empty(MAX_EPOCH) # Store all of the target results.
-accuracy_overtime = []                  # Store all of the guesses.
-mse_overtime      = []                  # Store all of the target results.
+correct = 0                                          # Cumulative result of correct guesses per epoch.
+guesses           = np.empty(MAX_EPOCH, np.uint32)   # Store all of the guesses.
+actual            = np.empty(MAX_EPOCH, np.uint32)   # Store all of the target results.
+accuracy_overtime = []                               # Store all of the guesses.
+mse_overtime      = []                               # Store all of the target results.
+guessBins         = np.zeros(OUTPUT_SIZE, np.uint32) # Store a dictionary of guesses and the count of times it was correct.
 
 assert MAX_EPOCH % EVAL == 0, 'ERROR: MAX_EPOCH MUST BE DIVISABLE BY EVAL!'
 
@@ -67,8 +72,8 @@ for epoch in range(MAX_EPOCH):
     t = oneHotEncode[labels[selected]]              # Target is oneHotEncoded for correct label.
 
     # Layer init
-    h = np.random.rand(HIDDEN_SIZE) # Hidden layer activations.
-    y = np.random.rand(OUTPUT_SIZE) # Output layer activations.
+    h = np.random.uniform(-1.0, 1.0, HIDDEN_SIZE) # Hidden layer activations.
+    y = np.random.uniform(-1.0, 1.0, OUTPUT_SIZE) # Output layer activations.
 
     # Free phase computation.
     for _ in range(MAX_FREE_PHASE):
@@ -94,23 +99,31 @@ for epoch in range(MAX_EPOCH):
 
     # Determine if guess was correct.
     guess = np.argmax(yf)                               # Get the networks guess for what the number is.
-    correct += np.array_equal(t, oneHotEncode[guess])   # Returns 'True' 1 if correct or 'False' 0 if incorrect.
+    isCorrect = np.array_equal(t, oneHotEncode[guess])  # Returns 'True' 1 if correct or 'False' 0 if incorrect.
+    correct += isCorrect
+    guessBins[guess] += isCorrect
     guesses[epoch] = guess
     actual[epoch] = labels[selected]
-    
-    # Display epoch and cumulative count correct.
+
+    # Display evaluation information.
     if epoch % EVAL == 0 and epoch != 0:
         mse = (1.0 / OUTPUT_SIZE) * np.sum((yf - t) ** 2)   # Using formula: 1/N * sum((model - target) ** 2)
         accuracy_per_epoch = correct / EVAL
         accuracy_overtime.append(accuracy_per_epoch)
         mse_overtime.append(mse)
         correct = 0                                         # Reset correct per epoch to 0.
+        unique, counts = np.unique(guesses[epoch-EVAL:epoch], return_counts=True)
+        value_count = np.asarray((unique, counts))
+        guess_freq  = np.asarray((np.arange(OUTPUT_SIZE), guessBins))
         print(f'{epoch}\t{round(accuracy_per_epoch, 3)}\t{round(mse, 3)}')
+        print(value_count)   # Horizontal table where value guessed is first row and count since last 100 is bottom row.
+        print(guess_freq)    # Horizontal table where the frequency of correct guesses are placed.
+        guessBins = np.zeros(OUTPUT_SIZE, np.int32)
 
 # Record the performance in a tsv.
 with open('ENN_perf.tsv', 'w') as f:
     print('Epoch\tAccuracy\tMSE', file=f)
-    for i in range(MAX_EPOCH // EVAL):
+    for i in range(1, len(mse_overtime) + 1):  # mse_overtime and accuracy_overtime have the same size.
         print(f'{i * EVAL}\t{accuracy_overtime[i]}\t{mse_overtime[i]}', file=f)
 
 # Record the results in a tsv.
