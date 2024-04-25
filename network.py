@@ -37,10 +37,10 @@ def free_phase(X, batch_size, hidden_weights, out_weights, learning_rate):
     # Load in the latest free phase energy value
     energy_val = 0.0
     for i in range(hidden_size):
-        energy_val += (hidden_layer_values[0][i] * hidden_layer_values[0][i])
+        energy_val += (hidden_layer_values[99][i] * hidden_layer_values[99][i])
         for j in range(output_size):  
             if i != j:     
-                energy_val -= out_weights[i][j] * hidden_layer_values[0][i] * output_layer_values[0][j]
+                energy_val -= out_weights[i][j] * hidden_layer_values[99][i] * output_layer_values[99][j]
     energy_val /= 2
     free_energy.append(energy_val)
 
@@ -180,7 +180,7 @@ batch_size = 100
 # Equilibrium propagation parameters
 alpha_1 = 0.1
 alpha_2 = 0.05
-beta = 1
+beta = -0.5
 data, x_test, label, y_test = train_test_split(data, label, test_size=0.1)
 
 start = time.time()
@@ -198,7 +198,7 @@ plt.close()
 
 # Generate the free energy plot with averaging filter applied
 avg_filter = np.ones(25) / 25
-plt.plot(range(len(free_energy)), np.convolve(free_energy, avg_filter, mode='same'))
+plt.plot(range(len(np.convolve(free_energy, avg_filter, mode='valid'))), np.convolve(free_energy, avg_filter, mode='valid'))
 plt.title("Free Energy over time")
 plt.xlabel("Episode #")
 plt.ylabel("Free Energy")
@@ -210,6 +210,7 @@ plt.plot(range(len(clamped_energy)), clamped_energy)
 plt.title("Clamped Energy over time")
 plt.xlabel("Episode #")
 plt.ylabel("Clamped Energy")
+plt.yscale('log')
 plt.savefig("clamped_energy.png")
 plt.close()
 
@@ -221,23 +222,24 @@ plt.plot(range(len(total_energy)), total_energy)
 plt.title("Hopfield Energy over time")
 plt.xlabel("Episode #")
 plt.ylabel("Hopfield Energy")
+plt.yscale('log')
 plt.savefig("hopfield_energy.png")
 plt.close()
 
-# Generate the hopfield energy plot for episode 500 and onward
-plt.plot(range(len(total_energy)-500), total_energy[500:])
-plt.title("Hopfield Energy over time (skipping to episode 500)")
-plt.xlabel("Episode # after 500")
-plt.ylabel("Hopfield Energy")
-plt.savefig("hopfield_energy_skipping.png")
-plt.close()
+# # Generate the hopfield energy plot for episode 500 and onward
+# plt.plot(range(len(total_energy[500:])), total_energy[500:])
+# plt.title("Hopfield Energy over time (skipping to episode 500)")
+# plt.xlabel("Episode # after 500")
+# plt.ylabel("Hopfield Energy")
+# plt.savefig("hopfield_energy_skipping.png")
+# plt.close()
 
 # Generate the hopfield energy plot for episode 500 and onward, with averaging filter as well
-plt.plot(range(len(total_energy)-500), np.convolve(total_energy[500:], avg_filter, mode='same'))
-plt.title("Hopfield Energy over time (skipping to episode 500)")
-plt.xlabel("Episode # after 500")
+plt.plot(range(len(np.convolve(total_energy, avg_filter, mode='valid'))), np.convolve(total_energy, avg_filter, mode='valid'))
+plt.title("Hopfield Energy over time")
+plt.xlabel("Episode #")
 plt.ylabel("Hopfield Energy")
-plt.savefig("hopfield_energy_skipping_smoothed.png")
+plt.savefig("hopfield_energy_smoothed.png")
 plt.close()
 
 # fig, ax = plt.subplots()
